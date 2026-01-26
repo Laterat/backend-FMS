@@ -3,7 +3,9 @@
 /node_modules
 /build
 
-/get-hqadmin-jwt
+# Generated files
+.get-hqadmin-jwt.ts
+.test-password-admin.ts
 
 # Logs
 logs
