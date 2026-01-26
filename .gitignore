@@ -3,6 +3,8 @@
 /node_modules
 /build
 
+/get-hqadmin-jwt
+
 # Logs
 logs
 *.log
