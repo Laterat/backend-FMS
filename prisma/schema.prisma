@@ -12,10 +12,40 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
+enum UserRole {
+  HQ_ADMIN
+  BRANCH_ADMIN
+  REFUELING_TEAM
+  REFUELING_MANAGER
+  FINANCE
+  FUEL_ADMIN
+  DRIVER
+}
+
+model Branch {
   id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
+  name      String
+  code      String   @unique             // unique branch identifier
+  region    String
+  zone      String
+  woreda    String
+  kebele    String
   createdAt DateTime @default(now())
+
+  users     User[]
+}
+
+model User {
+  id          String    @id @default(uuid())
+  fullName    String
+  email       String    @unique
+  role        UserRole
+  branchId    String?  
+  branch      Branch?   @relation(fields: [branchId], references: [id])
+  isActive    Boolean   @default(true)
+  phoneNumber String?   
+  employeeId  String?  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt  @default(now())
 }
 
