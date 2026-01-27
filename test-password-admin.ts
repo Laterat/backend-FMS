@@ -1,63 +1,76 @@
 import { createClient } from '@supabase/supabase-js';
-import * as crypto from 'crypto';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!; // for login
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Helper to generate temporary password
 function generateTempPassword(length = 12) {
-  return crypto.randomBytes(length).toString('base64').slice(0, length);
+  return Math.random().toString(36).slice(-length) + 'A1!'; // simple temp password
 }
 
-// List of Branch Admin emails you want to fix
-const branchAdmins = [
-  'branchadmin1@example.com',
-  'branchadmin2@example.com',
-];
+async function resetBranchAdminPassword(email: string) {
+  // 1️⃣ List users
+  const { data: listData, error: listError } =
+    await supabaseAdmin.auth.admin.listUsers();
 
-async function setTempPasswordAndGetJWT() {
-  for (const email of branchAdmins) {
-    // 1️⃣ Find user by email
-   // 1️⃣ Find user by email
-const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-  page: 1,        // start with first page
-  perPage: 100,   // max 100 users per page
-});
+  if (listError) throw listError;
 
+  const users = listData.users;
+  const user = users.find(u => u.email === email);
 
-    if (listError) {
-      console.error(`Error fetching users: ${listError.message}`);
-      continue;
-    }
+  if (!user) {
+    throw new Error(`User with email ${email} not found`);
+  }
 
-    const user = users.find(u => u.email === email);
-    if (!user) {
-      console.error(`User not found: ${email}`);
-      continue;
-    }
+  console.log(`Found user: ${user.id} (${user.email})`);
 
-    const tempPassword = generateTempPassword();
+  // 2️⃣ Generate temp password
+  const tempPassword = generateTempPassword();
 
-    // 2️⃣ Update password using user.id
-    const { data, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+  // 3️⃣ Update password
+  const { data: updateData, error: updateError } =
+    await supabaseAdmin.auth.admin.updateUserById(user.id, {
       password: tempPassword,
       email_confirm: true,
     });
 
-    if (updateError) {
-      console.error(`Failed to update password for ${email}: ${updateError.message}`);
-      continue;
+  if (updateError) throw updateError;
+
+  console.log(`Temporary password set for ${email}`);
+
+  // 4️⃣ Login to get JWT
+  const { data: loginData, error: loginError } =
+    await supabaseClient.auth.signInWithPassword({
+      email,
+      password: tempPassword,
+    });
+
+  if (loginError) throw loginError;
+
+  return loginData.session?.access_token;
+}
+
+
+// 🔹 Replace these emails with your branch admins
+const branchAdminEmails = [
+  'lateramekonnen@gmail.com',
+  'laterascholar@gmail.com',
+];
+
+async function main() {
+  for (const email of branchAdminEmails) {
+    try {
+      const token = await resetBranchAdminPassword(email);
+      console.log(`\nUse this JWT in Thunder Client for ${email}:\n${token}\n`);
+    } catch (err) {
+      console.error(`Error for ${email}:`, err.message || err);
     }
-
-    console.log(`✅ Password set for ${email}: ${tempPassword}`);
-
-    // ⚠ Supabase admin client cannot login users to get JWT
-    // You need to use Supabase client with anon key or REST API to get JWT
-    console.log(`Now use this password to log in via POST https://<YOUR-SUPABASE_URL>/auth/v1/token?grant_type=password`);
-    console.log('------------------------');
   }
 }
 
-setTempPasswordAndGetJWT().then(() => console.log('All done!')).catch(console.error);
+main();

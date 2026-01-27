@@ -22,6 +22,18 @@ enum UserRole {
   DRIVER
 }
 
+enum FuelSessionStatus {
+OPEN
+CLOSED
+FLAGGED
+}
+
+enum FuelRequestStatus {
+PENDING
+APPROVED
+REJECTED
+}
+
 model Branch {
   id        String   @id @default(uuid())
   name      String
@@ -31,8 +43,11 @@ model Branch {
   woreda    String
   kebele    String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   users     User[]
+  vehicles Vehicle[]
+  sessions FuelSession[]
 }
 
 model User {
@@ -46,6 +61,172 @@ model User {
   phoneNumber String?   
   employeeId  String?  
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Driver fuel requests
+  fuelRequests FuelRequest[] @relation("DriverRequests")
+
+  // Driver fuel sessions
+  fuelSessionsAsDriver FuelSession[] @relation("DriverFuelSessions")
+
+  // Sessions opened by this user
+  fuelSessionsOpened FuelSession[] @relation("FuelSessionsOpenedBy")
+
+  // Initial states recorded by this user
+  initialStatesRecorded FuelSessionInitialState[] @relation("InitialStatesRecordedBy")
+
+  // Final states recorded by this user
+  finalStatesRecorded FuelSessionFinalState[] @relation("FinalStatesRecordedBy")
+
+  // Metadata recorded by this user
+  metadataRecorded FuelSessionMetadata[] @relation("MetadataRecordedBy")
+
+  // Requests approved by this user
+  fuelRequestsApproved FuelRequest[] @relation("FuelRequestsApprovedBy")
+
+  // Transactions processed by this user
+  transactionsProcessed FinanceTransaction[] @relation("TransactionsProcessedBy")
+
+  // Consumption analyses done by this user
+  analysesDone FuelConsumptionAnalysis[] @relation("AnalysesBy")
+
+  // Fraud cases investigated by this user
+  fraudCasesInvestigated FraudCase[] @relation("FraudCasesBy")
+
 }
 
+model Vehicle {
+id                   String @id @default(uuid())
+vehicleCode          String @unique
+type                 String
+capacityLiters       Float
+standardConsumption  Float // liters per km
+branchId             String
+branch               Branch @relation(fields: [branchId], references: [id])
+createdAt            DateTime   @default(now())
+updatedAt            DateTime   @updatedAt
+
+
+sessions FuelSession[]
+}
+
+model FuelSession {
+  id            String @id @default(uuid())
+  branchId      String
+  branch        Branch @relation(fields: [branchId], references: [id])
+  vehicleId     String
+  vehicle       Vehicle @relation(fields: [vehicleId], references: [id])
+  driverId      String
+  driver        User @relation("DriverFuelSessions", fields: [driverId], references: [id])
+  erpTaskRef    String
+  status        FuelSessionStatus @default(OPEN)
+  openedById    String
+  openedBy      User @relation("FuelSessionsOpenedBy", fields: [openedById], references: [id])
+  openedAt      DateTime @default(now())
+  closedAt      DateTime?
+
+  initialState  FuelSessionInitialState?
+  finalState    FuelSessionFinalState?
+  metadata      FuelSessionMetadata?
+  fuelRequests  FuelRequest[]
+  analysis      FuelConsumptionAnalysis?
+  fraudCase     FraudCase?
+}
+
+
+model FuelSessionInitialState {
+  id             String @id @default(uuid())
+  fuelSessionId  String @unique
+  odometerStart  Int
+  fuelLevelStart Float
+  recordedAt     DateTime @default(now())
+  recordedById   String
+  recordedBy     User @relation("InitialStatesRecordedBy",fields: [recordedById], references: [id])
+  updatedAt      DateTime @updatedAt
+
+  fuelSession FuelSession @relation(fields: [fuelSessionId], references: [id])
+}
+model FuelSessionFinalState {
+  id             String @id @default(uuid())
+  fuelSessionId  String @unique
+  odometerEnd    Int
+  fuelLevelEnd   Float
+  recordedAt     DateTime @default(now())
+  recordedById   String
+  recordedBy     User @relation("FinalStatesRecordedBy", fields: [recordedById], references: [id])
+  updatedAt      DateTime @updatedAt
+
+  fuelSession FuelSession @relation(fields: [fuelSessionId], references: [id])
+}
+
+model FuelSessionMetadata {
+  id             String @id @default(uuid())
+  fuelSessionId  String @unique
+  departure      String
+  destination    String
+  department     String
+  description    String?
+  timeOut        DateTime
+  recordedById   String
+  recordedBy     User @relation("MetadataRecordedBy", fields: [recordedById], references: [id])
+  updatedAt      DateTime @updatedAt
+
+  fuelSession FuelSession @relation(fields: [fuelSessionId], references: [id])
+}
+
+model FuelRequest {
+  id             String @id @default(uuid())
+  fuelSessionId  String
+  requestedById  String
+  requestedBy    User @relation("DriverRequests", fields: [requestedById], references: [id])
+  requestedAmount Float
+  approvedAmount Float?
+  approvedById   String?
+  approvedBy     User? @relation("FuelRequestsApprovedBy",fields: [approvedById], references: [id])
+  status         FuelRequestStatus @default(PENDING)
+  managerComment String?
+  createdAt      DateTime @default(now())
+
+  fuelSession    FuelSession @relation(fields: [fuelSessionId], references: [id])
+  transaction    FinanceTransaction?
+}
+
+model FinanceTransaction {
+  id            String @id @default(uuid())
+  fuelRequestId String @unique
+  amount        Float
+  paymentMethod String
+  reference     String
+  paidAt        DateTime @default(now())
+  processedById String
+  processedBy   User @relation("TransactionsProcessedBy",fields: [processedById], references: [id])
+
+  fuelRequest FuelRequest @relation(fields: [fuelRequestId], references: [id])
+}
+
+model FuelConsumptionAnalysis {
+  id               String @id @default(uuid())
+  fuelSessionId    String @unique
+  distance         Float
+  expectedConsumption Float
+  actualConsumption Float
+  variance         Float
+  flagged          Boolean @default(false)
+  analyzedById     String
+  analyzedBy       User @relation("AnalysesBy", fields: [analyzedById], references: [id])
+
+  fuelSession FuelSession @relation(fields: [fuelSessionId], references: [id])
+}
+
+model FraudCase {
+  id               String @id @default(uuid())
+  fuelSessionId    String @unique
+  reason           String
+  resolved         Boolean @default(false)
+  resolutionNote   String?
+  createdAt        DateTime @default(now())
+  investigatedById String
+  investigatedBy   User @relation("FraudCasesBy",fields: [investigatedById], references: [id])
+
+  fuelSession FuelSession @relation(fields: [fuelSessionId], references: [id])
+}
