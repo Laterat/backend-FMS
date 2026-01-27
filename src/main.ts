@@ -6,7 +6,7 @@ async function bootstrap() {
 
   // 🔹 Enable CORS BEFORE listening
   app.enableCors({
-    origin: ['http://localhost:5173', 'https://fms-frontend-beta.vercel.app/'], // local dev + production frontend
+    origin: ['http://localhost:5173', 'https://fms-frontend-beta.vercel.app'], // local dev + production frontend
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true, // needed if you use cookies or auth headers
