@@ -1,3 +1,4 @@
+// supabase-admin.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -12,9 +13,7 @@ export class SupabaseAdminService {
     const url = this.config.get<string>('SUPABASE_URL');
     const key = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!url || !key) {
-      throw new Error('Supabase environment variables are missing');
-    }
+    if (!url || !key) throw new Error('Supabase environment variables are missing');
 
     this.supabase = createClient(url, key);
   }
@@ -26,20 +25,16 @@ export class SupabaseAdminService {
   async createUserWithPassword(email: string, role: string) {
     const tempPassword = this.generatePassword();
 
-    const userAttrs: any = {
+    const { data, error } = await this.supabase.auth.admin.createUser({
       email,
       password: tempPassword,
       email_confirm: true,
       user_metadata: { role },
-    };
-
-    userAttrs['password_update_required'] = true;
-
-    const { data, error } = await this.supabase.auth.admin.createUser(userAttrs);
+    });
 
     if (error) throw new BadRequestException(error.message);
 
-    const createdUser = data.user; // <-- destructure the actual user
+    const createdUser = data.user;
 
     const transporter = nodemailer.createTransport({
       host: this.config.get<string>('SMTP_HOST'),
@@ -56,15 +51,13 @@ export class SupabaseAdminService {
         from: `"HQ Admin" <${this.config.get<string>('SMTP_FROM')}>`,
         to: email,
         subject: 'Your Account Credentials',
-        text: `Your account has been created.\n\nEmail: ${email}\nTemporary Password: ${tempPassword}\n\nPlease log in and change your password immediately.`,
+        text: `Your account has been created.\n\nEmail: ${email}\nPassword: ${tempPassword}\n\nUse this password to log in directly.`,
       });
     } catch (err: any) {
-      if (createdUser?.id) {
-        await this.supabase.auth.admin.deleteUser(createdUser.id);
-      }
+      if (createdUser?.id) await this.supabase.auth.admin.deleteUser(createdUser.id);
       throw new BadRequestException(`Failed to send email: ${err.message}`);
     }
 
-    return createdUser; // return just the user object
+    return createdUser;
   }
 }
