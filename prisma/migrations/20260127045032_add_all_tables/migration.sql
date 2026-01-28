@@ -218,3 +218,5 @@ ALTER TABLE "FraudCase" ADD CONSTRAINT "FraudCase_investigatedById_fkey" FOREIGN
 
 -- AddForeignKey
 ALTER TABLE "FraudCase" ADD CONSTRAINT "FraudCase_fuelSessionId_fkey" FOREIGN KEY ("fuelSessionId") REFERENCES "FuelSession"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+

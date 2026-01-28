@@ -43,7 +43,26 @@ export class UsersService {
       }
     }
    
-  
+    // 🔒 Only ONE per branch rule
+if (
+  dto.role === UserRole.REFUELING_MANAGER ||
+  dto.role === UserRole.FUEL_ADMIN
+) {
+  const exists = await this.prisma.user.findFirst({
+    where: {
+      branchId: dto.branchId,
+      role: dto.role,
+      isActive: true,
+    },
+  });
+
+  if (exists) {
+    throw new BadRequestException(
+      `${dto.role} already exists in this branch`,
+    );
+  }
+}
+
 
     // Invite user via Supabase
    const user = await this.supabaseAdmin.inviteUserByEmail(dto.email);
