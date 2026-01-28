@@ -64,8 +64,10 @@ if (
 }
 
 
-    // Invite user via Supabase
-   const user = await this.supabaseAdmin.inviteUserByEmail(dto.email);
+   const user = await this.supabaseAdmin.inviteUserByEmail(
+  dto.email,
+  `${process.env.FRONTEND_URL}/set-password` // always required
+);
 
     // Create user in local DB
     return this.prisma.user.create({

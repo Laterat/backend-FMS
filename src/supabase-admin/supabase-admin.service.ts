@@ -4,7 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class SupabaseAdminService {
-    private supabase: SupabaseClient;
+  private supabase: SupabaseClient;
 
   constructor(private config: ConfigService) {
     const url = this.config.get<string>('SUPABASE_URL');
@@ -17,10 +17,14 @@ export class SupabaseAdminService {
     this.supabase = createClient(url, key);
   }
 
-  // Invite user via email
-  async inviteUserByEmail(email: string) {
-    const { data, error } = await this.supabase.auth.admin.inviteUserByEmail(email);
-    if (error) throw new BadRequestException(error.message);
-    return data.user;
-  }
+ async inviteUserByEmail(email: string, redirectTo: string) {
+  const { data, error } = await this.supabase.auth.admin.inviteUserByEmail(email, {
+    redirectTo
+  });
+
+  if (error) throw new BadRequestException(error.message);
+
+  return data.user;
+}
+
 }
